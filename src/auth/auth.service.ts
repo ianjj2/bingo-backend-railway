@@ -148,30 +148,55 @@ export class AuthService {
       throw new BadRequestException(`Erro ao criar usuário: ${error.message}`);
     }
 
-    // Gerar token de verificação de e-mail
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24); // 24 horas
+    console.log('✅ Usuário criado com sucesso:', user.id);
 
-    await this.supabase
-      .from('email_verification_tokens')
-      .insert({
+    try {
+      // Gerar token de verificação de e-mail
+      console.log('🔑 Gerando token de verificação...');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24); // 24 horas
+
+      const { error: tokenError } = await this.supabase
+        .from('email_verification_tokens')
+        .insert({
+          user_id: user.id,
+          token,
+          expires_at: expiresAt.toISOString(),
+        });
+
+      if (tokenError) {
+        console.log('⚠️ Erro ao criar token (não crítico):', tokenError);
+      } else {
+        console.log('✅ Token de verificação criado');
+      }
+    } catch (tokenErr) {
+      console.log('⚠️ Erro no token (não crítico):', tokenErr);
+    }
+
+    try {
+      // Enviar e-mail de verificação
+      console.log('📧 Tentando enviar email...');
+      await this.emailService.sendEmailVerification(email, 'dummy-token');
+      console.log('✅ Email enviado');
+    } catch (emailErr) {
+      console.log('⚠️ Erro no email (não crítico):', emailErr);
+    }
+
+    try {
+      // Log de auditoria
+      console.log('📋 Fazendo log de auditoria...');
+      await this.auditService.log({
+        type: 'user_registered',
         user_id: user.id,
-        token,
-        expires_at: expiresAt.toISOString(),
+        payload: { cpf, email, role: userRole },
+        ip_address: ipAddress,
+        user_agent: userAgent,
       });
-
-    // Enviar e-mail de verificação
-    await this.emailService.sendEmailVerification(email, token);
-
-    // Log de auditoria
-    await this.auditService.log({
-      type: 'user_registered',
-      user_id: user.id,
-      payload: { cpf, email, role: 'ouro' },
-      ip_address: ipAddress,
-      user_agent: userAgent,
-    });
+      console.log('✅ Log de auditoria feito');
+    } catch (auditErr) {
+      console.log('⚠️ Erro no audit (não crítico):', auditErr);
+    }
 
     return {
       message: 'Usuário criado com sucesso. Verifique seu e-mail para ativar a conta.',

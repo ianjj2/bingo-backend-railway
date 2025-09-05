@@ -59,8 +59,7 @@ export class WhitelistController {
   }
 
   @Get('check/:cpf')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Verificar se CPF está na whitelist' })
+  @ApiOperation({ summary: 'Verificar se CPF está na whitelist (público)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Status do CPF verificado' })
   async checkCpf(@Param('cpf') cpf: string) {
     const result = await this.whitelistService.checkCpfWhitelist(cpf);

@@ -37,17 +37,7 @@ export class AuthService {
     private readonly auditService: AuditService,
   ) {}
 
-  async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ 
-    message: string; 
-    user?: {
-      id: string;
-      cpf: string;
-      email: string;
-      role: string;
-      tier: string;
-      status: string;
-    }
-  }> {
+  async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ message: string }> {
     const { cpf, email, password } = registerDto;
 
     console.log('🔍 Debug registro:', { cpf, email, passwordLength: password?.length });
@@ -176,15 +166,7 @@ export class AuthService {
     console.log('🎉 Cadastro finalizado com sucesso!');
 
     return {
-      message: 'Cadastro realizado com sucesso! Você já pode fazer login.',
-      user: {
-        id: user.id,
-        cpf: user.cpf,
-        email: user.email,
-        role: user.role,
-        tier: user.tier,
-        status: user.status
-      }
+      message: 'Cadastro realizado com sucesso! Você já pode fazer login.'
     };
   }
 

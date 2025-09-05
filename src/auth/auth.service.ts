@@ -42,10 +42,14 @@ export class AuthService {
   async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ message: string }> {
     const { cpf, email, password } = registerDto;
 
+    console.log('🔍 Debug registro:', { cpf, email, passwordLength: password?.length });
+
     // Validar CPF
     if (!validateCpf(cpf)) {
+      console.log('❌ CPF inválido:', cpf);
       throw new BadRequestException('CPF inválido. Verifique os dígitos.');
     }
+    console.log('✅ CPF válido:', cpf);
 
     // Validar se CPF está na whitelist
     const cleanCpf = cpf.replace(/[^0-9]/g, ''); // Remove formatação
@@ -57,16 +61,20 @@ export class AuthService {
       .single();
 
     if (whitelistCheck.error || !whitelistCheck.data) {
+      console.log('❌ CPF não autorizado:', cleanCpf, whitelistCheck.error);
       throw new UnauthorizedException('CPF não autorizado para cadastro. Entre em contato com o suporte.');
     }
 
     const userTier = whitelistCheck.data.tier;
+    console.log('✅ CPF autorizado:', cleanCpf, 'Tier:', userTier);
 
     // Validar senha
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.valid) {
+      console.log('❌ Senha inválida:', passwordValidation.errors);
       throw new BadRequestException(passwordValidation.errors.join('. '));
     }
+    console.log('✅ Senha válida');
 
     // Verificar se CPF já existe
     const { data: existingCpf } = await this.supabase

@@ -98,15 +98,18 @@ export class AuthService {
     const passwordHash = await hashPassword(password);
     console.log('✅ Hash da senha criado');
 
-    // Mapear tier para role (Supabase enum aceita: 'ouro', 'diamante', 'black', 'admin')
+    // Mapear tier para role 
+    // TEMPORÁRIO: BLACK mapeado para OURO até adicionar black no enum
     let userRole = 'ouro'; // default
     if (userTier === 'DIAMANTE') {
       userRole = 'diamante';
     } else if (userTier === 'BLACK') {
-      userRole = 'black';
+      userRole = 'ouro'; // TEMPORÁRIO: usar ouro para black
     } else if (userTier === 'OURO') {
       userRole = 'ouro';
     }
+    
+    console.log(`📋 Mapeamento: tier='${userTier}' → role='${userRole}'`);
 
     // Dados para inserção
     const userData = {

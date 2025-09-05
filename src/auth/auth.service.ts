@@ -47,6 +47,21 @@ export class AuthService {
       throw new BadRequestException('CPF inválido. Verifique os dígitos.');
     }
 
+    // Validar se CPF está na whitelist
+    const cleanCpf = cpf.replace(/[^0-9]/g, ''); // Remove formatação
+    const whitelistCheck = await this.supabase
+      .from('cpf_whitelist')
+      .select('cpf, tier, ativo')
+      .eq('cpf', cleanCpf)
+      .eq('ativo', true)
+      .single();
+
+    if (whitelistCheck.error || !whitelistCheck.data) {
+      throw new UnauthorizedException('CPF não autorizado para cadastro. Entre em contato com o suporte.');
+    }
+
+    const userTier = whitelistCheck.data.tier;
+
     // Validar senha
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.valid) {
@@ -85,10 +100,11 @@ export class AuthService {
         cpf,
         email,
         password_hash: passwordHash,
-        role: 'ouro',
+        role: 'user',
+        tier: userTier, // Tier da whitelist (DIAMANTE, etc)
         status: 'active',
       })
-      .select('id, cpf, email, role, status, created_at')
+      .select('id, cpf, email, role, tier, status, created_at')
       .single();
 
     if (error) {

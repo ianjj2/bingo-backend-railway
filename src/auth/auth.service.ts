@@ -37,7 +37,17 @@ export class AuthService {
     private readonly auditService: AuditService,
   ) {}
 
-  async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ message: string }> {
+  async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ 
+    message: string; 
+    user?: {
+      id: string;
+      cpf: string;
+      email: string;
+      role: string;
+      tier: string;
+      status: string;
+    }
+  }> {
     const { cpf, email, password } = registerDto;
 
     console.log('🔍 Debug registro:', { cpf, email, passwordLength: password?.length });
@@ -336,8 +346,8 @@ export class AuthService {
         expires_at: expiresAt.toISOString(),
       });
 
-    // Enviar e-mail de reset
-    await this.emailService.sendPasswordReset(email, token);
+    // Email removido - reset não funcional por enquanto
+    console.log('⚠️ Reset de senha solicitado, mas email desabilitado:', email);
 
     // Log de auditoria
     await this.auditService.log({

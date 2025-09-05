@@ -58,6 +58,14 @@ export class AuthController {
     @Body() registerDto: RegisterDto,
     @Req() req: Request,
   ) {
+    console.log('🚀 Controller registro recebido:', {
+      registerDto,
+      cpf: registerDto?.cpf,
+      email: registerDto?.email,
+      passwordLength: registerDto?.password?.length,
+      headers: req.headers['content-type']
+    });
+
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     

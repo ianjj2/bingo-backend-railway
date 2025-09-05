@@ -94,24 +94,46 @@ export class AuthService {
     }
 
     // Hash da senha
+    console.log('🔐 Fazendo hash da senha...');
     const passwordHash = await hashPassword(password);
+    console.log('✅ Hash da senha criado');
+
+    // Dados para inserção
+    const userData = {
+      cpf: cleanCpf, // Usar CPF limpo sempre
+      email,
+      password_hash: passwordHash,
+      role: 'user',
+      tier: userTier, // Tier da whitelist (DIAMANTE, etc)
+      status: 'active',
+    };
+    
+    console.log('💾 Tentando criar usuário no Supabase:', {
+      cpf: userData.cpf,
+      email: userData.email,
+      role: userData.role,
+      tier: userData.tier,
+      status: userData.status,
+      passwordHashLength: passwordHash.length
+    });
 
     // Criar usuário
     const { data: user, error } = await this.supabase
       .from('users')
-      .insert({
-        cpf,
-        email,
-        password_hash: passwordHash,
-        role: 'user',
-        tier: userTier, // Tier da whitelist (DIAMANTE, etc)
-        status: 'active',
-      })
+      .insert(userData)
       .select('id, cpf, email, role, tier, status, created_at')
       .single();
 
+    console.log('📝 Resultado da inserção:', { user, error });
+
     if (error) {
-      throw new BadRequestException('Erro ao criar usuário.');
+      console.log('❌ ERRO DETALHADO no Supabase:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw new BadRequestException(`Erro ao criar usuário: ${error.message}`);
     }
 
     // Gerar token de verificação de e-mail

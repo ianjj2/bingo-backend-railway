@@ -28,10 +28,10 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
       provide: 'SUPABASE_CLIENT_ANON',
       useFactory: (configService: ConfigService): SupabaseClient => {
         const supabaseUrl = configService.get<string>('SUPABASE_URL');
-        const supabaseAnonKey = configService.get<string>('SUPABASE_ANON_KEY');
+        const supabaseAnonKey = configService.get<string>('SUPABASE_ANON_KEY') || configService.get<string>('SUPABASE_SERVICE_KEY');
         
         if (!supabaseUrl || !supabaseAnonKey) {
-          throw new Error('Supabase URL e ANON KEY são obrigatórios');
+          throw new Error('Supabase URL e ANON KEY (ou SERVICE KEY) são obrigatórios');
         }
 
         return createClient(supabaseUrl, supabaseAnonKey);

@@ -34,6 +34,69 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post('check-whitelist-test')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar se whitelist existe' })
+  async checkWhitelistTest() {
+    try {
+      // Verificar se a tabela existe e tem dados
+      const { data, error } = await this.authService['supabase']
+        .from('cpf_whitelist')
+        .select('cpf, tier, ativo')
+        .limit(5);
+
+      console.log('🔍 Whitelist check:', { data, error });
+
+      return {
+        tableExists: !error,
+        rowCount: data?.length || 0,
+        sampleData: data || [],
+        error: error?.message || null
+      };
+    } catch (error) {
+      return {
+        tableExists: false,
+        error: error.message
+      };
+    }
+  }
+
+  @Post('register-test')
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Teste de registro sem validações' })
+  async registerTest(@Body() body: any) {
+    try {
+      console.log('🧪 TESTE DE REGISTRO:', body);
+      
+      // Dados fixos para teste
+      const testData = {
+        cpf: '05162673102', // DIAMANTE da whitelist
+        email: body.email || 'teste@email.com',
+        password: body.password || 'MinhaSenh4123'
+      };
+      
+      console.log('🧪 Dados de teste:', testData);
+      
+      // Chamar service diretamente SEM validações do DTO
+      const result = await this.authService.register(testData, '127.0.0.1', 'test');
+      
+      return {
+        success: true,
+        message: 'Teste funcionou!',
+        result
+      };
+    } catch (error) {
+      console.log('❌ ERRO NO TESTE:', error);
+      return {
+        success: false,
+        error: error.message,
+        stack: error.stack
+      };
+    }
+  }
+
   @Public()
   @UseGuards(ThrottlerGuard)
   @Post('register')

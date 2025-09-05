@@ -44,12 +44,8 @@ export class AuthService {
 
     console.log('🔍 Debug registro:', { cpf, email, passwordLength: password?.length });
 
-    // Validar CPF
-    if (!validateCpf(cpf)) {
-      console.log('❌ CPF inválido:', cpf);
-      throw new BadRequestException('CPF inválido. Verifique os dígitos.');
-    }
-    console.log('✅ CPF válido:', cpf);
+    // Apenas limpar CPF, sem validar por enquanto
+    console.log('✅ CPF recebido:', cpf);
 
     // Validar se CPF está na whitelist
     const cleanCpf = cpf.replace(/[^0-9]/g, ''); // Remove formatação
@@ -68,13 +64,12 @@ export class AuthService {
     const userTier = whitelistCheck.data.tier;
     console.log('✅ CPF autorizado:', cleanCpf, 'Tier:', userTier);
 
-    // Validar senha
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) {
-      console.log('❌ Senha inválida:', passwordValidation.errors);
-      throw new BadRequestException(passwordValidation.errors.join('. '));
+    // Validação de senha simplificada
+    if (!password || password.length < 4) {
+      console.log('❌ Senha muito simples');
+      throw new BadRequestException('Senha deve ter pelo menos 4 caracteres.');
     }
-    console.log('✅ Senha válida');
+    console.log('✅ Senha aceita');
 
     // Verificar se CPF já existe
     const { data: existingCpf } = await this.supabase

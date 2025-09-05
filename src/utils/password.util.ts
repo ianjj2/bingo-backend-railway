@@ -19,34 +19,24 @@ export function validatePassword(password: string): {
 } {
   const errors: string[] = [];
   
-  if (password.length < 8) {
-    errors.push('A senha deve ter ao menos 8 caracteres');
-  }
-  
-  if (!/[a-zA-Z]/.test(password)) {
-    errors.push('A senha deve conter ao menos uma letra');
-  }
-  
-  if (!/\d/.test(password)) {
-    errors.push('A senha deve conter ao menos um número');
+  if (password.length < 6) {
+    errors.push('A senha deve ter ao menos 6 caracteres');
   }
   
   if (password.length > 128) {
     errors.push('A senha não pode ter mais de 128 caracteres');
   }
   
-  // Verificar padrões comuns fracos
+  // Verificar padrões muito comuns
   const commonPatterns = [
-    /^123+/,
-    /^abc+/i,
-    /^password/i,
-    /^qwerty/i,
-    /^admin/i,
+    /^123456$/,
+    /^password$/i,
+    /^admin$/i,
   ];
   
   for (const pattern of commonPatterns) {
     if (pattern.test(password)) {
-      errors.push('A senha não pode conter padrões comuns');
+      errors.push('A senha é muito comum');
       break;
     }
   }

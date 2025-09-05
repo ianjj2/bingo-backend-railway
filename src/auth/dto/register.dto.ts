@@ -5,13 +5,11 @@ import { normalizeCpf } from '../../utils/cpf.util';
 
 export class RegisterDto {
   @ApiProperty({
-    description: 'CPF do usuário (apenas números ou formatado)',
-    example: '12345678901',
-    pattern: '^[0-9]{11}$',
+    description: 'CPF do usuário (aceita formatado ou apenas números)',
+    example: '123.456.789-01 ou 12345678901',
   })
   @IsString({ message: 'CPF deve ser uma string' })
   @Transform(({ value }) => normalizeCpf(value))
-  @Matches(/^[0-9]{11}$/, { message: 'CPF deve conter exatamente 11 dígitos' })
   cpf: string;
 
   @ApiProperty({
@@ -22,14 +20,11 @@ export class RegisterDto {
   email: string;
 
   @ApiProperty({
-    description: 'Senha (mínimo 8 caracteres, deve conter letras e números)',
+    description: 'Senha (mínimo 6 caracteres)',
     example: 'MinhaSenh@123',
-    minLength: 8,
+    minLength: 6,
   })
   @IsString({ message: 'Senha deve ser uma string' })
-  @MinLength(8, { message: 'Senha deve ter ao menos 8 caracteres' })
-  @Matches(/^(?=.*[a-zA-Z])(?=.*\d)/, {
-    message: 'Senha deve conter ao menos uma letra e um número',
-  })
+  @MinLength(6, { message: 'Senha deve ter ao menos 6 caracteres' })
   password: string;
 }

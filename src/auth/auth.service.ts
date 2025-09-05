@@ -23,7 +23,6 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 
 import { hashPassword, verifyPassword, validatePassword } from '../utils/password.util';
 import { validateCpf } from '../utils/cpf.util';
-import { EmailService } from '../email/email.service';
 import { AuditService } from '../audit/audit.service';
 
 import { User, UserResponse } from '../types/database.types';
@@ -35,7 +34,6 @@ export class AuthService {
     private readonly supabase: SupabaseClient,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly emailService: EmailService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -150,46 +148,13 @@ export class AuthService {
 
     console.log('✅ Usuário criado com sucesso:', user.id);
 
+    // Log de auditoria (opcional)
     try {
-      // Gerar token de verificação de e-mail
-      console.log('🔑 Gerando token de verificação...');
-      const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24); // 24 horas
-
-      const { error: tokenError } = await this.supabase
-        .from('email_verification_tokens')
-        .insert({
-          user_id: user.id,
-          token,
-          expires_at: expiresAt.toISOString(),
-        });
-
-      if (tokenError) {
-        console.log('⚠️ Erro ao criar token (não crítico):', tokenError);
-      } else {
-        console.log('✅ Token de verificação criado');
-      }
-    } catch (tokenErr) {
-      console.log('⚠️ Erro no token (não crítico):', tokenErr);
-    }
-
-    try {
-      // Enviar e-mail de verificação
-      console.log('📧 Tentando enviar email...');
-      await this.emailService.sendEmailVerification(email, 'dummy-token');
-      console.log('✅ Email enviado');
-    } catch (emailErr) {
-      console.log('⚠️ Erro no email (não crítico):', emailErr);
-    }
-
-    try {
-      // Log de auditoria
       console.log('📋 Fazendo log de auditoria...');
       await this.auditService.log({
         type: 'user_registered',
         user_id: user.id,
-        payload: { cpf, email, role: userRole },
+        payload: { cpf, email, role: userRole, tier: userTier },
         ip_address: ipAddress,
         user_agent: userAgent,
       });
@@ -198,8 +163,18 @@ export class AuthService {
       console.log('⚠️ Erro no audit (não crítico):', auditErr);
     }
 
+    console.log('🎉 Cadastro finalizado com sucesso!');
+
     return {
-      message: 'Usuário criado com sucesso. Verifique seu e-mail para ativar a conta.',
+      message: 'Cadastro realizado com sucesso! Você já pode fazer login.',
+      user: {
+        id: user.id,
+        cpf: user.cpf,
+        email: user.email,
+        role: user.role,
+        tier: user.tier,
+        status: user.status
+      }
     };
   }
 

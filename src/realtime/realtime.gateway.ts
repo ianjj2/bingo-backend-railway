@@ -260,6 +260,231 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     client.emit('pong', { timestamp: Date.now() });
   }
 
+  // ========== FUNCIONALIDADES DE CHAT ==========
+
+  @SubscribeMessage('chat.join')
+  async handleJoinChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { matchId?: string },
+  ) {
+    const userConnection = this.connectedUsers.get(client.id);
+    if (!userConnection) {
+      client.emit('error', { message: 'Usuário não autenticado' });
+      return;
+    }
+
+    try {
+      const chatRoom = data.matchId ? `chat:match:${data.matchId}` : 'chat:global';
+      
+      // Entrar na sala de chat
+      await client.join(chatRoom);
+      
+      // Confirmar entrada no chat
+      client.emit('chat.joined', { 
+        room: chatRoom,
+        userId: userConnection.userId 
+      });
+
+      this.logger.log(`💬 Usuário ${userConnection.userId} entrou no chat: ${chatRoom}`);
+
+      // Notificar outros usuários (opcional)
+      client.to(chatRoom).emit('chat.user_joined', {
+        userId: userConnection.userId,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      this.logger.error(`Erro ao entrar no chat: ${error.message}`);
+      client.emit('error', { message: 'Erro ao entrar no chat' });
+    }
+  }
+
+  @SubscribeMessage('chat.leave')
+  async handleLeaveChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { matchId?: string },
+  ) {
+    const userConnection = this.connectedUsers.get(client.id);
+    if (!userConnection) return;
+
+    try {
+      const chatRoom = data.matchId ? `chat:match:${data.matchId}` : 'chat:global';
+      
+      // Sair da sala de chat
+      await client.leave(chatRoom);
+      
+      // Confirmar saída do chat
+      client.emit('chat.left', { room: chatRoom });
+
+      this.logger.log(`💬 Usuário ${userConnection.userId} saiu do chat: ${chatRoom}`);
+
+      // Notificar outros usuários (opcional)
+      client.to(chatRoom).emit('chat.user_left', {
+        userId: userConnection.userId,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      this.logger.error(`Erro ao sair do chat: ${error.message}`);
+    }
+  }
+
+  @SubscribeMessage('chat.send_message')
+  async handleSendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { 
+      message: string;
+      matchId?: string;
+    },
+  ) {
+    const userConnection = this.connectedUsers.get(client.id);
+    if (!userConnection) {
+      client.emit('error', { message: 'Usuário não autenticado' });
+      return;
+    }
+
+    try {
+      const { message, matchId } = data;
+
+      // Validar mensagem
+      if (!message || message.trim().length === 0) {
+        client.emit('error', { message: 'Mensagem não pode estar vazia' });
+        return;
+      }
+
+      if (message.length > 200) {
+        client.emit('error', { message: 'Mensagem muito longa (máximo 200 caracteres)' });
+        return;
+      }
+
+      const chatRoom = matchId ? `chat:match:${matchId}` : 'chat:global';
+
+      // TODO: Buscar dados completos do usuário do banco
+      // Por enquanto, usar dados básicos
+      const userData = {
+        id: userConnection.userId,
+        email: 'usuario@exemplo.com', // TODO: buscar do banco
+        role: userConnection.userData.role || 'ouro',
+      };
+
+      const chatMessage = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        user: userData.email.split('@')[0],
+        message: message.trim(),
+        timestamp: new Date().toISOString(),
+        userTier: userData.role,
+        userId: userConnection.userId,
+      };
+
+      // Enviar mensagem para todos na sala (incluindo o remetente)
+      this.server.to(chatRoom).emit('chat.new_message', chatMessage);
+
+      this.logger.log(`💬 Mensagem enviada por ${userConnection.userId} no chat ${chatRoom}: ${message.substring(0, 50)}...`);
+
+      // Log de auditoria
+      await this.auditService.log({
+        type: 'chat_message_sent',
+        user_id: userConnection.userId,
+        match_id: matchId,
+        payload: { 
+          message: message.trim(),
+          chatRoom,
+          messageLength: message.length 
+        },
+      });
+
+      // Gerar respostas automáticas do sistema (opcional)
+      await this.generateSystemResponse(chatRoom, message, matchId);
+
+    } catch (error) {
+      this.logger.error(`Erro ao enviar mensagem: ${error.message}`);
+      client.emit('error', { message: 'Erro ao enviar mensagem' });
+    }
+  }
+
+  @SubscribeMessage('chat.typing')
+  async handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { 
+      isTyping: boolean;
+      matchId?: string;
+    },
+  ) {
+    const userConnection = this.connectedUsers.get(client.id);
+    if (!userConnection) return;
+
+    try {
+      const { isTyping, matchId } = data;
+      const chatRoom = matchId ? `chat:match:${matchId}` : 'chat:global';
+
+      // Notificar outros usuários sobre o status de digitação
+      client.to(chatRoom).emit('chat.user_typing', {
+        userId: userConnection.userId,
+        isTyping,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      this.logger.error(`Erro no indicador de digitação: ${error.message}`);
+    }
+  }
+
+  // Método auxiliar para gerar respostas automáticas
+  private async generateSystemResponse(chatRoom: string, message: string, matchId?: string) {
+    const lowerMessage = message.toLowerCase();
+    
+    // Aguardar um pouco antes de responder
+    setTimeout(async () => {
+      let systemResponse = null;
+
+      if (lowerMessage.includes('bingo')) {
+        systemResponse = {
+          id: `sys_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          user: 'Sistema',
+          message: '🎉 BINGO! Alguém está com sorte hoje! 🍀',
+          timestamp: new Date().toISOString(),
+          userTier: 'diamante',
+          userId: 'system',
+        };
+      } else if (lowerMessage.includes('sorte') || lowerMessage.includes('boa sorte')) {
+        systemResponse = {
+          id: `sys_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          user: 'Moderador',
+          message: '🍀 Boa sorte para você também! Que venham os prêmios! 💰',
+          timestamp: new Date().toISOString(),
+          userTier: 'diamante',
+          userId: 'moderator',
+        };
+      } else if (lowerMessage.includes('prêmio') || lowerMessage.includes('premio')) {
+        systemResponse = {
+          id: `sys_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          user: 'Sistema',
+          message: '💎 Os prêmios estão esperando! Continue jogando! 🎯',
+          timestamp: new Date().toISOString(),
+          userTier: 'diamante',
+          userId: 'system',
+        };
+      }
+
+      if (systemResponse) {
+        // Enviar resposta do sistema
+        this.server.to(chatRoom).emit('chat.new_message', systemResponse);
+        
+        // Log da resposta automática
+        await this.auditService.log({
+          type: 'chat_system_response',
+          user_id: 'system',
+          match_id: matchId,
+          payload: { 
+            originalMessage: message,
+            systemResponse: systemResponse.message,
+            chatRoom 
+          },
+        });
+      }
+    }, 1000 + Math.random() * 2000); // 1-3 segundos
+  }
+
   // Método para admins forçarem atualizações
   @SubscribeMessage('admin.force_update')
   async handleAdminForceUpdate(

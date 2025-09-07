@@ -346,10 +346,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       const { matchId } = data;
       const chatRoom = `chat:match:${matchId}`;
       
-      // Verificar se usuário está na partida
+      // Verificar se usuário está na partida (aviso, mas permite conexão)
       if (userConnection.matchId !== matchId) {
-        client.emit('error', { message: 'Você deve estar na partida para acessar o chat' });
-        return;
+        this.logger.warn(`Usuário ${userConnection.userId} tentando acessar chat da partida ${matchId} sem estar nela`);
+        client.emit('chat.warning', { message: 'Você deve estar na partida para participar do chat' });
+        // Continuar para permitir visualização do histórico
       }
       
       // Entrar na sala de chat
@@ -451,7 +452,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         return;
       }
 
-      // Verificar se usuário está na partida
+      // Verificar se usuário está na partida (obrigatório para enviar mensagens)
       if (userConnection.matchId !== matchId) {
         client.emit('error', { message: 'Você deve estar na partida para enviar mensagens' });
         return;

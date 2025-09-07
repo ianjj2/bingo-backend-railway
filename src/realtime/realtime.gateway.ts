@@ -18,6 +18,7 @@ import { CardsService } from '../cards/cards.service';
 import { AuditService } from '../audit/audit.service';
 import { ChatService } from '../chat/chat.service';
 import { RateLimiterService } from '../common/rate-limiter.service';
+import { PerformanceMonitorService } from '../common/performance-monitor.service';
 import { CacheService } from '../cache/cache.service';
 
 @WebSocketGateway({
@@ -39,7 +40,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   server: Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
-  private connectedUsers = new Map<string, { userId: string; userData: any }>();
+  private connectedUsers = new Map<string, { userId: string; userData: any; matchId?: string }>();
+  private matchUsers = new Map<string, Set<string>>(); // matchId -> Set<socketId>
+  private userSockets = new Map<string, string>(); // userId -> socketId
 
   constructor(
     private readonly realtimeService: RealtimeService,
@@ -48,13 +51,27 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private readonly auditService: AuditService,
     private readonly chatService: ChatService,
     private readonly rateLimiter: RateLimiterService,
+    private readonly performanceMonitor: PerformanceMonitorService,
     private readonly cache: CacheService,
     private readonly jwtService: JwtService,
   ) {
-    // Limpeza automática a cada 5 minutos
+    // Limpeza automática e monitoramento a cada 5 minutos
     setInterval(() => {
       this.rateLimiter.cleanup();
       this.cache.cleanup();
+      
+      // Salvar métricas de performance
+      const metrics = this.performanceMonitor.getCurrentMetrics(
+        this.connectedUsers.size,
+        this.matchUsers.size
+      );
+      this.performanceMonitor.saveMetrics(metrics);
+      
+      // Log de alertas se houver
+      const alerts = this.performanceMonitor.getPerformanceAlerts(metrics);
+      if (alerts.length > 0) {
+        this.logger.warn(`⚠️ Performance Alerts: ${alerts.join(', ')}`);
+      }
     }, 5 * 60 * 1000);
   }
 
@@ -74,13 +91,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         role: 'ouro',
       };
 
-      // Registrar conexão
+      // Registrar conexão otimizada
       this.connectedUsers.set(client.id, { userId: userData.id, userData });
+      this.userSockets.set(userData.id, client.id);
       
       // Entrar na sala do usuário
       await client.join(`user:${userData.id}`);
       
-      this.logger.log(`👤 Usuário conectado: ${userData.id} (${client.id})`);
+      this.logger.log(`👤 Usuário conectado: ${userData.id} (${client.id}) - Total: ${this.connectedUsers.size}`);
 
       // Enviar dados de conexão
       client.emit('connection.success', {
@@ -105,16 +123,29 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const userConnection = this.connectedUsers.get(client.id);
     
     if (userConnection) {
-      this.logger.log(`👤 Usuário desconectado: ${userConnection.userId} (${client.id})`);
+      // Remover de todas as estruturas de dados
+      this.connectedUsers.delete(client.id);
+      this.userSockets.delete(userConnection.userId);
+      
+      // Remover das salas de partidas
+      if (userConnection.matchId) {
+        const matchUsers = this.matchUsers.get(userConnection.matchId);
+        if (matchUsers) {
+          matchUsers.delete(client.id);
+          if (matchUsers.size === 0) {
+            this.matchUsers.delete(userConnection.matchId);
+          }
+        }
+      }
+      
+      this.logger.log(`👤 Usuário desconectado: ${userConnection.userId} (${client.id}) - Total: ${this.connectedUsers.size}`);
       
       // Log de auditoria
       await this.auditService.log({
         type: 'websocket_disconnected',
         user_id: userConnection.userId,
-        payload: { socketId: client.id },
+        payload: { socketId: client.id, totalConnected: this.connectedUsers.size },
       });
-      
-      this.connectedUsers.delete(client.id);
     }
   }
 
@@ -135,23 +166,43 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       // Verificar se a partida existe
       await this.matchesService.findOne(matchId);
       
+      // 🚀 OTIMIZAÇÃO: Gerenciar salas eficientemente
+      
+      // Sair da partida anterior se existir
+      if (userConnection.matchId) {
+        await this.removeUserFromMatch(client.id, userConnection.matchId);
+      }
+      
       // Entrar na sala da partida
       await client.join(`match:${matchId}`);
       
-      // Buscar cartelas do usuário
-      const userCards = await this.cardsService.getUserCards(userConnection.userId, matchId);
+      // Atualizar estruturas de dados otimizadas
+      userConnection.matchId = matchId;
+      if (!this.matchUsers.has(matchId)) {
+        this.matchUsers.set(matchId, new Set());
+      }
+      this.matchUsers.get(matchId)!.add(client.id);
       
-      // Buscar estado atual da partida
-      const matchState = await this.matchesService.getMatchState(matchId);
+      // 📊 Cache: Buscar dados em paralelo
+      const [userCards, matchState, cachedState] = await Promise.all([
+        this.cardsService.getUserCards(userConnection.userId, matchId),
+        this.matchesService.getMatchState(matchId),
+        this.cache.getMatchState(matchId)
+      ]);
       
-      // Enviar dados iniciais
+      // Cache do estado para próximas consultas
+      await this.cache.setMatchState(matchId, matchState);
+      
+      // Enviar dados iniciais otimizados
       client.emit('match.joined', {
         matchId,
         userCards,
-        matchState,
+        matchState: cachedState || matchState,
+        connectedUsers: this.matchUsers.get(matchId)!.size,
+        timestamp: new Date().toISOString(),
       });
 
-      this.logger.log(`🎯 Usuário ${userConnection.userId} entrou na partida ${matchId}`);
+      this.logger.log(`🎯 Usuário ${userConnection.userId} entrou na partida ${matchId} - Participantes: ${this.matchUsers.get(matchId)!.size}`);
 
       // Log de auditoria
       await this.auditService.log({
@@ -164,6 +215,19 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     } catch (error) {
       this.logger.error(`Erro ao entrar na partida: ${error.message}`);
       client.emit('error', { message: 'Erro ao entrar na partida' });
+    }
+  }
+
+  private async removeUserFromMatch(socketId: string, matchId: string): Promise<void> {
+    const matchUsers = this.matchUsers.get(matchId);
+    if (matchUsers) {
+      matchUsers.delete(socketId);
+      if (matchUsers.size === 0) {
+        this.matchUsers.delete(matchId);
+        // Limpar cache da partida vazia
+        await this.cache.del(`match:${matchId}`);
+        this.logger.log(`🏁 Partida ${matchId} esvaziou - removida do cache`);
+      }
     }
   }
 
@@ -403,8 +467,26 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         userId: userConnection.userId,
       };
 
-      // Enviar mensagem para todos na sala (incluindo o remetente)
-      this.server.to(chatRoom).emit('chat.new_message', chatMessage);
+      // 🚀 BROADCAST OTIMIZADO: Apenas para usuários da mesma partida
+      if (matchId) {
+        const matchUsers = this.matchUsers.get(matchId);
+        if (matchUsers && matchUsers.size > 0) {
+          // Enviar para usuários específicos da partida (MUITO mais eficiente)
+          matchUsers.forEach(socketId => {
+            const socket = this.server.sockets.sockets.get(socketId);
+            if (socket) {
+              socket.emit('chat.new_message', chatMessage);
+            }
+          });
+          this.logger.log(`💬 Mensagem enviada para ${matchUsers.size} usuários da partida ${matchId}`);
+        }
+      } else {
+        // Chat global (fallback)
+        this.server.to(chatRoom).emit('chat.new_message', chatMessage);
+      }
+
+      // 📊 Registrar métricas de performance
+      this.performanceMonitor.recordMessage();
 
       this.logger.log(`💬 Mensagem enviada por ${userConnection.userId} no chat ${chatRoom}: ${message.substring(0, 50)}...`);
 
@@ -551,10 +633,21 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return;
     }
 
-    // Stats simplificados sem Redis
+    // 📊 Stats avançados com performance monitoring
+    const performanceStats = this.performanceMonitor.getStatsForAdmin(
+      this.connectedUsers.size,
+      this.matchUsers.size
+    );
+    
     client.emit('admin.stats', {
-      connectedUsers: this.connectedUsers.size,
-      chatRoomsActive: 0, // Implementar depois se necessário
+      ...performanceStats,
+      matchUsers: Object.fromEntries(
+        Array.from(this.matchUsers.entries()).map(([matchId, sockets]) => [
+          matchId, 
+          sockets.size
+        ])
+      ),
+      cacheStats: this.cache.getStats(),
     });
   }
 }

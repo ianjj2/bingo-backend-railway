@@ -36,7 +36,7 @@ CREATE POLICY "Admin can do everything" ON chat_messages
     USING (
         EXISTS (
             SELECT 1 FROM users 
-            WHERE id = auth.uid()::text 
+            WHERE id::text = auth.uid()::text 
             AND role = 'admin'
         )
     );

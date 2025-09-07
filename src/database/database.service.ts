@@ -25,14 +25,26 @@ export class DatabaseService {
 
   // Métodos específicos para cada tabela
   async insertChatMessage(data: any): Promise<any> {
-    const { data: result, error } = await this.supabase
-      .from('chat_messages')
-      .insert(data)
-      .select()
-      .single();
+    try {
+      console.log('💾 Tentando inserir mensagem:', data);
+      
+      const { data: result, error } = await this.supabase
+        .from('chat_messages')
+        .insert(data)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return result;
+      if (error) {
+        console.error('❌ Erro ao inserir mensagem no Supabase:', error);
+        throw new Error(`Erro no banco: ${error.message}`);
+      }
+      
+      console.log('✅ Mensagem inserida com sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro geral ao inserir mensagem:', error);
+      throw error;
+    }
   }
 
   async getChatMessages(matchId: string, limit: number = 50, offset: number = 0): Promise<any[]> {

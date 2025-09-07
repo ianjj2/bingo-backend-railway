@@ -50,7 +50,7 @@ import { AppController } from './app.controller';
     MatchesModule,
     CardsModule,
     AdminModule,
-    // RealtimeModule, // ❌ TEMPORARIAMENTE DESABILITADO - PRECISA REDIS
+    RealtimeModule, // ✅ HABILITADO - AGORA SEM REDIS
   ],
   controllers: [AppController], // ✅ ADICIONADO CONTROLLER PRINCIPAL
 })

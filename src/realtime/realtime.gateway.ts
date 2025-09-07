@@ -48,8 +48,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   afterInit(server: Server) {
     this.realtimeService.setServer(server);
-    this.realtimeService.setupRedisSubscriber();
-    this.logger.log('🔌 WebSocket Gateway inicializado');
+    // Redis removido - funcionando em memória local
+    this.logger.log('🔌 WebSocket Gateway inicializado sem Redis');
   }
 
   async handleConnection(client: Socket) {
@@ -527,10 +527,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return;
     }
 
-    const stats = this.realtimeService.getConnectionStats();
+    // Stats simplificados sem Redis
     client.emit('admin.stats', {
-      ...stats,
       connectedUsers: this.connectedUsers.size,
+      chatRoomsActive: 0, // Implementar depois se necessário
     });
   }
 }

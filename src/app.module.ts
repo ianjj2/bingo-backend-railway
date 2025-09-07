@@ -50,7 +50,7 @@ import { AppController } from './app.controller';
     MatchesModule,
     CardsModule,
     AdminModule,
-    RealtimeModule, // ✅ HABILITADO PARA CHAT FUNCIONAR
+    // RealtimeModule, // ❌ TEMPORARIAMENTE DESABILITADO - PRECISA REDIS
   ],
   controllers: [AppController], // ✅ ADICIONADO CONTROLLER PRINCIPAL
 })

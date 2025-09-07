@@ -328,7 +328,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @SubscribeMessage('chat.join')
   async handleJoinChat(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { matchId?: string },
+    @MessageBody() data: { matchId: string }, // ✅ OBRIGATÓRIO: Apenas chat de partidas
   ) {
     const userConnection = this.connectedUsers.get(client.id);
     if (!userConnection) {
@@ -336,19 +336,55 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return;
     }
 
+    // 🚨 VALIDAÇÃO: Chat apenas em partidas específicas
+    if (!data.matchId) {
+      client.emit('error', { message: 'Chat disponível apenas dentro de partidas' });
+      return;
+    }
+
     try {
-      const chatRoom = data.matchId ? `chat:match:${data.matchId}` : 'chat:global';
+      const { matchId } = data;
+      const chatRoom = `chat:match:${matchId}`;
+      
+      // Verificar se usuário está na partida
+      if (userConnection.matchId !== matchId) {
+        client.emit('error', { message: 'Você deve estar na partida para acessar o chat' });
+        return;
+      }
       
       // Entrar na sala de chat
       await client.join(chatRoom);
       
+      // 📚 CARREGAR HISTÓRICO DO BANCO DE DADOS
+      const startTime = Date.now();
+      try {
+        const chatHistory = await this.chatService.getMatchMessages(matchId, 50); // Últimas 50 mensagens
+        
+        // Enviar histórico para o cliente
+        client.emit('chat.history', {
+          messages: chatHistory,
+          matchId,
+          total: chatHistory.length,
+          timestamp: new Date().toISOString(),
+        });
+        
+        this.performanceMonitor.recordResponseTime(startTime);
+        this.logger.log(`📚 Histórico carregado: ${chatHistory.length} mensagens para usuário ${userConnection.userId} na partida ${matchId}`);
+      } catch (error) {
+        this.logger.error(`❌ Erro ao carregar histórico: ${error.message}`);
+        // Continuar mesmo se histórico falhar
+        client.emit('chat.history', { messages: [], matchId, total: 0 });
+      }
+      
       // Confirmar entrada no chat
       client.emit('chat.joined', { 
         room: chatRoom,
-        userId: userConnection.userId 
+        matchId,
+        userId: userConnection.userId,
+        timestamp: new Date().toISOString(),
       });
 
-      this.logger.log(`💬 Usuário ${userConnection.userId} entrou no chat: ${chatRoom}`);
+      this.logger.log(`💬 Usuário ${userConnection.userId} entrou no chat da partida ${matchId}`);
 
       // Notificar outros usuários (opcional)
       client.to(chatRoom).emit('chat.user_joined', {
@@ -397,7 +433,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { 
       message: string;
-      matchId?: string;
+      matchId: string; // ✅ OBRIGATÓRIO: Apenas chat de partidas
     },
   ) {
     const userConnection = this.connectedUsers.get(client.id);
@@ -408,6 +444,18 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     try {
       const { message, matchId } = data;
+
+      // 🚨 VALIDAÇÃO: Chat apenas em partidas específicas
+      if (!matchId) {
+        client.emit('error', { message: 'Chat disponível apenas dentro de partidas' });
+        return;
+      }
+
+      // Verificar se usuário está na partida
+      if (userConnection.matchId !== matchId) {
+        client.emit('error', { message: 'Você deve estar na partida para enviar mensagens' });
+        return;
+      }
 
       // 🚦 RATE LIMITING
       if (this.rateLimiter.isRateLimited(userConnection.userId)) {

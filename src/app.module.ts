@@ -11,6 +11,8 @@ import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ChatModule } from './chat/chat.module';
+import { CommonModule } from './common/common.module';
+import { CacheModule } from './cache/cache.module';
 import { AuditModule } from './audit/audit.module';
 import { AppController } from './app.controller';
 
@@ -42,6 +44,10 @@ import { AppController } from './app.controller';
     ]),
 
     // Módulos da aplicação
+    // Módulos de sistema OTIMIZADOS
+    CommonModule, // ✅ Rate limiting e utilitários
+    CacheModule, // ✅ Cache em memória para performance
+    
     DatabaseModule,
     // RedisModule, // DESABILITADO - CAUSA TRAVAMENTO SEM REDIS INSTALADO
     EmailModule,
@@ -52,7 +58,7 @@ import { AppController } from './app.controller';
     CardsModule,
     AdminModule,
     ChatModule, // ✅ NOVO: Sistema de chat com histórico
-    RealtimeModule, // ✅ HABILITADO - AGORA SEM REDIS
+    RealtimeModule, // ✅ HABILITADO - AGORA SEM REDIS + OTIMIZADO
   ],
   controllers: [AppController], // ✅ ADICIONADO CONTROLLER PRINCIPAL
 })

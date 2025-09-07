@@ -17,6 +17,8 @@ import { MatchesService } from '../matches/matches.service';
 import { CardsService } from '../cards/cards.service';
 import { AuditService } from '../audit/audit.service';
 import { ChatService } from '../chat/chat.service';
+import { RateLimiterService } from '../common/rate-limiter.service';
+import { CacheService } from '../cache/cache.service';
 
 @WebSocketGateway({
   cors: {
@@ -45,8 +47,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private readonly cardsService: CardsService,
     private readonly auditService: AuditService,
     private readonly chatService: ChatService,
+    private readonly rateLimiter: RateLimiterService,
+    private readonly cache: CacheService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    // Limpeza automática a cada 5 minutos
+    setInterval(() => {
+      this.rateLimiter.cleanup();
+      this.cache.cleanup();
+    }, 5 * 60 * 1000);
+  }
 
   afterInit(server: Server) {
     this.realtimeService.setServer(server);
@@ -334,6 +344,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     try {
       const { message, matchId } = data;
+
+      // 🚦 RATE LIMITING
+      if (this.rateLimiter.isRateLimited(userConnection.userId)) {
+        const remaining = this.rateLimiter.getRemainingMessages(userConnection.userId);
+        client.emit('error', { 
+          message: `Muitas mensagens! Aguarde. Restam: ${remaining}`,
+          type: 'rate_limit' 
+        });
+        return;
+      }
 
       // Validar mensagem
       if (!message || message.trim().length === 0) {

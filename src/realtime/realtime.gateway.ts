@@ -516,35 +516,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         userId: userConnection.userId,
       };
 
-      // 🚀 BROADCAST OTIMIZADO: Apenas para usuários da mesma partida
-      if (matchId) {
-        const matchUsers = this.matchUsers.get(matchId);
-        this.logger.log(`🔍 DEBUG: matchUsers para ${matchId}: ${matchUsers ? matchUsers.size : 'undefined'}`);
-        
-        if (matchUsers && matchUsers.size > 0) {
-          // Enviar para usuários específicos da partida (MUITO mais eficiente)
-          let sentCount = 0;
-          matchUsers.forEach(socketId => {
-            const socket = this.server.sockets.sockets.get(socketId);
-            if (socket) {
-              socket.emit('chat.new_message', chatMessage);
-              sentCount++;
-              this.logger.log(`📤 Mensagem enviada para socket: ${socketId}`);
-            } else {
-              this.logger.warn(`⚠️ Socket não encontrado: ${socketId}`);
-            }
-          });
-          this.logger.log(`💬 Mensagem enviada para ${sentCount}/${matchUsers.size} usuários da partida ${matchId}`);
-        } else {
-          this.logger.warn(`⚠️ Nenhum usuário encontrado na partida ${matchId} para receber mensagem`);
-          // Fallback: usar room do Socket.IO
-          this.server.to(chatRoom).emit('chat.new_message', chatMessage);
-          this.logger.log(`📡 Fallback: Mensagem enviada via room ${chatRoom}`);
-        }
-      } else {
-        // Chat global (fallback)
-        this.server.to(chatRoom).emit('chat.new_message', chatMessage);
-      }
+      // 🚀 BROADCAST: Usar rooms do Socket.IO (mais confiável)
+      this.server.to(chatRoom).emit('chat.new_message', chatMessage);
+      this.logger.log(`💬 Mensagem enviada via room ${chatRoom} para partida ${matchId}`);
+      
+      // DEBUG: Verificar quantos usuários estão na room
+      const roomSockets = await this.server.in(chatRoom).fetchSockets();
+      this.logger.log(`🔍 DEBUG: ${roomSockets.length} sockets conectados na room ${chatRoom}`);
 
       // 📊 Registrar métricas de performance
       this.performanceMonitor.recordMessage();

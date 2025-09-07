@@ -72,7 +72,7 @@ export class AuthController {
       
       // Dados fixos para teste
       const testData = {
-        cpf: 05162673102', // DIAMANTE da whitelist
+        cpf: '05162673102', // DIAMANTE da whitelist
         email: body.email || 'teste@email.com',
         password: body.password || 'MinhaSenh4123'
       };

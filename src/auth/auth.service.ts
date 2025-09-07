@@ -215,7 +215,7 @@ export class AuthService {
 
     // Verificar se e-mail foi verificado
     if (!user.email_verified_at) {
-      throw new UnauthorizedException('Confirme seu e-mail para continuar.');
+      throw new UnauthorizedException('SISTEMA SERÁ LIBERADO O ACESSO EM 08/09/2025');
     }
 
     // Reset dos failed attempts

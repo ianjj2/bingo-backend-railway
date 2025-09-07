@@ -49,53 +49,37 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   afterInit(server: Server) {
     this.realtimeService.setServer(server);
     // Redis removido - funcionando em memória local
-    this.logger.log('🔌 WebSocket Gateway inicializado sem Redis');
+    this.logger.log('🔌 WebSocket Gateway inicializado sem Redis'); 
   }
 
   async handleConnection(client: Socket) {
     try {
-      // Extrair token do handshake
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer ', '');
+      this.logger.log(`🔌 Nova conexão WebSocket: ${client.id}`);
       
-      if (!token) {
-        this.logger.warn(`Conexão rejeitada - token não fornecido: ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      // Verificar token
-      const payload = this.jwtService.verify(token);
-      if (!payload.sub) {
-        this.logger.warn(`Conexão rejeitada - token inválido: ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      // Buscar dados do usuário
-      // TODO: Implementar busca de usuário no database
+      // TEMPORÁRIO: Desabilitar autenticação para teste
       const userData = {
-        id: payload.sub,
-        role: 'ouro', // TODO: buscar do banco
+        id: 'test-user-' + Date.now(),
+        role: 'ouro',
       };
 
       // Registrar conexão
-      this.connectedUsers.set(client.id, { userId: payload.sub, userData });
+      this.connectedUsers.set(client.id, { userId: userData.id, userData });
       
       // Entrar na sala do usuário
-      await client.join(`user:${payload.sub}`);
+      await client.join(`user:${userData.id}`);
       
-      this.logger.log(`👤 Usuário conectado: ${payload.sub} (${client.id})`);
+      this.logger.log(`👤 Usuário conectado: ${userData.id} (${client.id})`);
 
       // Enviar dados de conexão
       client.emit('connection.success', {
-        userId: payload.sub,
+        userId: userData.id,
         timestamp: new Date().toISOString(),
       });
 
       // Log de auditoria
       await this.auditService.log({
         type: 'websocket_connected',
-        user_id: payload.sub,
+        user_id: userData.id,
         payload: { socketId: client.id },
       });
 

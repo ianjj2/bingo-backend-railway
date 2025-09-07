@@ -11,6 +11,7 @@ import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { AuditModule } from './audit/audit.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -49,7 +50,8 @@ import { AuditModule } from './audit/audit.module';
     MatchesModule,
     CardsModule,
     AdminModule,
-    // RealtimeModule, // DESABILITADO - DEPENDE DO REDIS
+    RealtimeModule, // ✅ HABILITADO PARA CHAT FUNCIONAR
   ],
+  controllers: [AppController], // ✅ ADICIONADO CONTROLLER PRINCIPAL
 })
 export class AppModule {}

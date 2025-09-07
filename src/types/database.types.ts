@@ -178,3 +178,24 @@ export interface BingoValidatedEvent {
   card_id: string;
   draw_index: number;
 }
+
+// Chat Messages
+export interface ChatMessage {
+  id: string;
+  match_id: string;
+  user_id: string;
+  user_name: string;
+  user_tier: UserRole;
+  message: string;
+  type: 'text' | 'system' | 'announcement';
+  created_at: string;
+}
+
+export interface ChatMessageCreate {
+  match_id: string;
+  user_id: string;
+  user_name: string;
+  user_tier: UserRole;
+  message: string;
+  type?: 'text' | 'system' | 'announcement';
+}

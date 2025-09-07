@@ -6,6 +6,7 @@ import { RealtimeService } from './realtime.service';
 import { MatchesModule } from '../matches/matches.module';
 import { CardsModule } from '../cards/cards.module';
 import { AuditModule } from '../audit/audit.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -13,7 +14,8 @@ import { AuditModule } from '../audit/audit.module';
     JwtModule.register({}),
     MatchesModule, 
     CardsModule, 
-    AuditModule
+    AuditModule,
+    ChatModule
   ],
   providers: [RealtimeGateway, RealtimeService],
   exports: [RealtimeService],

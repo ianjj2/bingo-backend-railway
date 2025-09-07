@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { ChatModule } from './chat/chat.module';
 import { AuditModule } from './audit/audit.module';
 import { AppController } from './app.controller';
 
@@ -50,6 +51,7 @@ import { AppController } from './app.controller';
     MatchesModule,
     CardsModule,
     AdminModule,
+    ChatModule, // ✅ NOVO: Sistema de chat com histórico
     RealtimeModule, // ✅ HABILITADO - AGORA SEM REDIS
   ],
   controllers: [AppController], // ✅ ADICIONADO CONTROLLER PRINCIPAL

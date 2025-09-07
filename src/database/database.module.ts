@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { DatabaseService } from './database.service';
 
 @Global()
 @Module({
@@ -38,7 +39,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
       },
       inject: [ConfigService],
     },
+    DatabaseService,
   ],
-  exports: ['SUPABASE_CLIENT', 'SUPABASE_CLIENT_ANON'],
+  exports: ['SUPABASE_CLIENT', 'SUPABASE_CLIENT_ANON', DatabaseService],
 })
 export class DatabaseModule {}

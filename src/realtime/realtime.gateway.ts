@@ -16,6 +16,7 @@ import { RealtimeService } from './realtime.service';
 import { MatchesService } from '../matches/matches.service';
 import { CardsService } from '../cards/cards.service';
 import { AuditService } from '../audit/audit.service';
+import { ChatService } from '../chat/chat.service';
 
 @WebSocketGateway({
   cors: {
@@ -43,13 +44,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private readonly matchesService: MatchesService,
     private readonly cardsService: CardsService,
     private readonly auditService: AuditService,
+    private readonly chatService: ChatService,
     private readonly jwtService: JwtService,
   ) {}
 
   afterInit(server: Server) {
     this.realtimeService.setServer(server);
     // Redis removido - funcionando em memória local
-    this.logger.log('🔌 WebSocket Gateway inicializado sem Redis'); 
+    this.logger.log('🔌 WebSocket Gateway inicializado sem Redis');   
   }
 
   async handleConnection(client: Socket) {
@@ -354,11 +356,29 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         role: userConnection.userData.role || 'ouro',
       };
 
+      // 💾 SALVAR MENSAGEM NO BANCO DE DADOS
+      let savedMessage;
+      if (matchId) {
+        try {
+          savedMessage = await this.chatService.createMessage({
+            match_id: matchId,
+            user_id: userConnection.userId,
+            user_name: userData.email.split('@')[0],
+            user_tier: userData.role,
+            message: message.trim(),
+            type: 'text',
+          });
+          this.logger.log(`💾 Mensagem salva no banco: ${savedMessage.id}`);
+        } catch (error) {
+          this.logger.error(`❌ Erro ao salvar mensagem: ${error.message}`);
+        }
+      }
+
       const chatMessage = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: savedMessage?.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         user: userData.email.split('@')[0],
         message: message.trim(),
-        timestamp: new Date().toISOString(),
+        timestamp: savedMessage?.created_at || new Date().toISOString(),
         userTier: userData.role,
         userId: userConnection.userId,
       };

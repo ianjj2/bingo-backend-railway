@@ -70,3 +70,4 @@ WHERE tablename = 'cpf_whitelist';
 
 -- Script executado com sucesso!
 -- A tabela cpf_whitelist está pronta para uso.
+

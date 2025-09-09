@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 import { MatchStatus } from '../types/database.types';
 
@@ -131,9 +132,10 @@ export class MatchesController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({
     summary: 'Obter partida por ID',
-    description: 'Retorna detalhes de uma partida específica.',
+    description: 'Retorna detalhes de uma partida específica. Endpoint público para uso em displays de TV.',
   })
   @ApiParam({ name: 'id', description: 'ID da partida' })
   @ApiResponse({
@@ -398,9 +400,10 @@ export class MatchesController {
   }
 
   @Get(':id/state')
+  @Public()
   @ApiOperation({
     summary: 'Obter estado da partida',
-    description: 'Retorna o estado atual da partida com números sorteados, vencedores, etc.',
+    description: 'Retorna o estado atual da partida com números sorteados, vencedores, etc. Endpoint público para uso em displays de TV.',
   })
   @ApiParam({ name: 'id', description: 'ID da partida' })
   @ApiResponse({

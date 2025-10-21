@@ -20,10 +20,12 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
 
 import { hashPassword, verifyPassword, validatePassword } from '../utils/password.util';
 import { validateCpf } from '../utils/cpf.util';
 import { AuditService } from '../audit/audit.service';
+import { EmailService } from '../email/email.service';
 
 import { User, UserResponse } from '../types/database.types';
 
@@ -35,6 +37,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly emailService: EmailService,
   ) {}
 
   async register(registerDto: RegisterDto, ipAddress?: string, userAgent?: string): Promise<{ message: string }> {
@@ -318,7 +321,7 @@ export class AuthService {
     // Gerar token de reset
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutos
+    expiresAt.setMinutes(expiresAt.getMinutes() + 60); // 60 minutos (1 hora)
 
     await this.supabase
       .from('password_reset_tokens')
@@ -328,8 +331,15 @@ export class AuthService {
         expires_at: expiresAt.toISOString(),
       });
 
-    // Email removido - reset não funcional por enquanto
-    console.log('⚠️ Reset de senha solicitado, mas email desabilitado:', email);
+    // ✅ ENVIAR EMAIL REAL
+    try {
+      await this.emailService.sendPasswordReset(user.email, token);
+      console.log(`✅ Email de reset enviado para ${user.email}`);
+    } catch (emailError) {
+      console.error('❌ Erro ao enviar email de reset:', emailError);
+      // Não falha a operação se o email não for enviado
+      // Mas loga o erro para investigação
+    }
 
     // Log de auditoria
     await this.auditService.log({
@@ -341,6 +351,52 @@ export class AuthService {
 
     return {
       message: 'Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.',
+    };
+  }
+
+  async validateResetToken(validateTokenDto: ValidateResetTokenDto): Promise<{ valid: boolean; message?: string }> {
+    const { token } = validateTokenDto;
+
+    if (!token) {
+      return {
+        valid: false,
+        message: 'Token não fornecido',
+      };
+    }
+
+    // Buscar token no banco
+    const { data: resetToken, error } = await this.supabase
+      .from('password_reset_tokens')
+      .select('id, user_id, expires_at, used')
+      .eq('token', token)
+      .single();
+
+    if (error || !resetToken) {
+      return {
+        valid: false,
+        message: 'Token inválido',
+      };
+    }
+
+    // Verificar se já foi usado
+    if (resetToken.used) {
+      return {
+        valid: false,
+        message: 'Token já foi utilizado',
+      };
+    }
+
+    // Verificar se expirou
+    if (new Date() > new Date(resetToken.expires_at)) {
+      return {
+        valid: false,
+        message: 'Token expirado. Solicite um novo reset de senha.',
+      };
+    }
+
+    return {
+      valid: true,
+      message: 'Token válido',
     };
   }
 

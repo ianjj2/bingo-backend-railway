@@ -28,6 +28,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -227,6 +228,29 @@ export class AuthController {
     const ipAddress = req.ip || req.connection.remoteAddress;
     
     return this.authService.forgotPassword(forgotPasswordDto, ipAddress);
+  }
+
+  @Public()
+  @Post('validate-reset-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Validar token de reset',
+    description: 'Verifica se um token de reset de senha é válido e não expirou.',
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Resultado da validação',
+    schema: {
+      type: 'object',
+      properties: {
+        valid: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Token válido' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Token não fornecido' })
+  async validateResetToken(@Body() validateTokenDto: ValidateResetTokenDto) {
+    return this.authService.validateResetToken(validateTokenDto);
   }
 
   @Public()

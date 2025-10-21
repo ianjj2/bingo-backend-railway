@@ -7,14 +7,36 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
+    // Configurar transporter do Nodemailer com Gmail
+    const emailUser = this.configService.get('EMAIL_USER');
+    const emailPass = this.configService.get('EMAIL_PASS');
+    
+    if (!emailUser || !emailPass) {
+      console.warn('⚠️ Variáveis EMAIL_USER e EMAIL_PASS não configuradas. Email será desabilitado.');
+      // Criar transporter fake para não quebrar a aplicação
+      this.transporter = nodemailer.createTransport({
+        streamTransport: true,
+        newline: 'unix',
+        buffer: true,
+      });
+      return;
+    }
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get('SMTP_HOST'),
-      port: parseInt(this.configService.get('SMTP_PORT') || '587'),
-      secure: false, // true para 465, false para outras portas
+      service: 'gmail',
       auth: {
-        user: this.configService.get('SMTP_USER'),
-        pass: this.configService.get('SMTP_PASS'),
+        user: emailUser,
+        pass: emailPass,
       },
+    });
+
+    // Verificar conexão
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error('❌ Erro na configuração do email:', error);
+      } else {
+        console.log('✅ Servidor de email (Gmail) pronto para enviar mensagens');
+      }
     });
   }
 

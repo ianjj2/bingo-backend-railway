@@ -7,9 +7,11 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
-    // Configurar transporter do Nodemailer com Gmail
+    // Configurar transporter do Nodemailer
     const emailUser = this.configService.get('EMAIL_USER');
     const emailPass = this.configService.get('EMAIL_PASS');
+    const smtpHost = this.configService.get('SMTP_HOST');
+    const smtpPort = this.configService.get('SMTP_PORT');
     
     if (!emailUser || !emailPass) {
       console.warn('⚠️ Variáveis EMAIL_USER e EMAIL_PASS não configuradas. Email será desabilitado.');
@@ -22,20 +24,44 @@ export class EmailService {
       return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-    });
+    // Detectar se é Gmail ou SMTP customizado
+    const isGmail = emailUser.includes('@gmail.com');
+    
+    if (isGmail) {
+      // Configuração para Gmail
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: emailUser,
+          pass: emailPass,
+        },
+      });
+      console.log('📧 Configurando email com Gmail...');
+    } else {
+      // Configuração SMTP genérica (Hostinger, etc)
+      this.transporter = nodemailer.createTransport({
+        host: smtpHost || 'smtp.hostinger.com',
+        port: parseInt(smtpPort || '587'),
+        secure: smtpPort === '465', // true para 465, false para outras portas
+        auth: {
+          user: emailUser,
+          pass: emailPass,
+        },
+        tls: {
+          rejectUnauthorized: false, // Para servidores com certificado autoassinado
+        },
+      });
+      console.log(`📧 Configurando email com SMTP: ${smtpHost || 'smtp.hostinger.com'}:${smtpPort || '587'}`);
+    }
 
     // Verificar conexão
     this.transporter.verify((error, success) => {
       if (error) {
         console.error('❌ Erro na configuração do email:', error);
+        console.error('   Verifique as credenciais e configurações SMTP');
       } else {
-        console.log('✅ Servidor de email (Gmail) pronto para enviar mensagens');
+        console.log('✅ Servidor de email pronto para enviar mensagens');
+        console.log(`   📨 Emails serão enviados de: ${emailUser}`);
       }
     });
   }
@@ -45,7 +71,10 @@ export class EmailService {
     const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
 
     const mailOptions = {
-      from: this.configService.get('EMAIL_FROM'),
+      from: {
+        name: 'Bravo.Bet',
+        address: this.configService.get('EMAIL_USER'),
+      },
       to: email,
       subject: '🎯 Verificação de E-mail - Bingo Live Bravo.Bet',
       html: `
@@ -169,7 +198,10 @@ export class EmailService {
     const resetUrl = `${frontendUrl}/auth/reset-password?token=${token}`;
 
     const mailOptions = {
-      from: this.configService.get('EMAIL_FROM'),
+      from: {
+        name: 'Bravo.Bet - Suporte',
+        address: this.configService.get('EMAIL_USER'),
+      },
       to: email,
       subject: '🔒 Redefinição de Senha - Bingo Live Bravo.Bet',
       html: `

@@ -29,6 +29,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
+import { ForgotPasswordCpfDto } from './dto/forgot-password-cpf.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -207,8 +208,8 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Solicitar recuperação de senha',
-    description: 'Envia e-mail com link para redefinir senha.',
+    summary: 'Solicitar recuperação de senha por e-mail',
+    description: 'Envia e-mail com link para redefinir senha usando o e-mail.',
   })
   @ApiResponse({ 
     status: 200, 
@@ -228,6 +229,38 @@ export class AuthController {
     const ipAddress = req.ip || req.connection.remoteAddress;
     
     return this.authService.forgotPassword(forgotPasswordDto, ipAddress);
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Post('forgot-password-cpf')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Solicitar recuperação de senha por CPF',
+    description: 'Busca usuário pelo CPF e envia e-mail com link para redefinir senha.',
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'E-mail de recuperação enviado (se o CPF existir)',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { 
+          type: 'string',
+          example: 'Se o CPF estiver cadastrado, você receberá instruções no e-mail: i***a@bravo.bet.br'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'CPF inválido' })
+  @ApiResponse({ status: 429, description: 'Muitas tentativas' })
+  async forgotPasswordByCpf(
+    @Body() forgotPasswordCpfDto: ForgotPasswordCpfDto,
+    @Req() req: Request,
+  ) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    
+    return this.authService.forgotPasswordByCpf(forgotPasswordCpfDto, ipAddress);
   }
 
   @Public()

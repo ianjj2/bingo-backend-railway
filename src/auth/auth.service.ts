@@ -21,6 +21,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
+import { ForgotPasswordCpfDto } from './dto/forgot-password-cpf.dto';
 
 import { hashPassword, verifyPassword, validatePassword } from '../utils/password.util';
 import { validateCpf } from '../utils/cpf.util';
@@ -398,6 +399,85 @@ export class AuthService {
       valid: true,
       message: 'Token válido',
     };
+  }
+
+  async forgotPasswordByCpf(forgotPasswordCpfDto: ForgotPasswordCpfDto, ipAddress?: string): Promise<{ message: string }> {
+    const { cpf } = forgotPasswordCpfDto;
+
+    // Limpar formatação do CPF
+    const cleanCpf = cpf.replace(/[^0-9]/g, '');
+
+    // Verificar rate limiting
+    await this.checkRateLimit(cleanCpf, 'forgot_password_cpf');
+
+    // Buscar usuário pelo CPF
+    const { data: user } = await this.supabase
+      .from('users')
+      .select('id, email, cpf')
+      .eq('cpf', cleanCpf)
+      .single();
+
+    // Sempre retornar sucesso por segurança (não revelar se CPF existe)
+    if (!user) {
+      return {
+        message: 'Se o CPF estiver cadastrado, você receberá instruções no e-mail associado à conta.',
+      };
+    }
+
+    // Gerar token de reset
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 60); // 60 minutos (1 hora)
+
+    await this.supabase
+      .from('password_reset_tokens')
+      .insert({
+        user_id: user.id,
+        token,
+        expires_at: expiresAt.toISOString(),
+      });
+
+    // Mascarar email para exibir na resposta
+    const maskedEmail = this.maskEmail(user.email);
+
+    // ✅ ENVIAR EMAIL REAL
+    try {
+      await this.emailService.sendPasswordReset(user.email, token);
+      console.log(`✅ Email de reset (CPF) enviado para ${user.email}`);
+    } catch (emailError) {
+      console.error('❌ Erro ao enviar email de reset (CPF):', emailError);
+      // Não falha a operação se o email não for enviado
+    }
+
+    // Log de auditoria
+    await this.auditService.log({
+      type: 'password_reset_requested_cpf',
+      user_id: user.id,
+      payload: { cpf: cleanCpf, maskedEmail },
+      ip_address: ipAddress,
+    });
+
+    return {
+      message: `Se o CPF estiver cadastrado, você receberá instruções no e-mail: ${maskedEmail}`,
+    };
+  }
+
+  /**
+   * Mascara email para segurança
+   * Exemplo: teste@email.com → t***e@email.com
+   */
+  private maskEmail(email: string): string {
+    const [username, domain] = email.split('@');
+    
+    if (username.length <= 2) {
+      return email; // Email muito curto, não mascarar
+    }
+    
+    const firstChar = username.charAt(0);
+    const lastChar = username.charAt(username.length - 1);
+    const masked = '*'.repeat(Math.max(username.length - 2, 1));
+    
+    return `${firstChar}${masked}${lastChar}@${domain}`;
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto, ipAddress?: string): Promise<{ message: string }> {

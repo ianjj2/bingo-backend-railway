@@ -39,19 +39,26 @@ export class EmailService {
       console.log('📧 Configurando email com Gmail...');
     } else {
       // Configuração SMTP genérica (Hostinger, etc)
+      const port = parseInt(smtpPort || '465'); // ✅ Usar 465 por padrão (melhor para cloud)
+      const isSecure = port === 465;
+      
       this.transporter = nodemailer.createTransport({
         host: smtpHost || 'smtp.hostinger.com',
-        port: parseInt(smtpPort || '587'),
-        secure: smtpPort === '465', // true para 465, false para outras portas
+        port: port,
+        secure: isSecure, // true para 465 (SSL), false para 587 (TLS)
         auth: {
           user: emailUser,
           pass: emailPass,
         },
         tls: {
-          rejectUnauthorized: false, // Para servidores com certificado autoassinado
+          rejectUnauthorized: false,
         },
+        // ✅ Configurações extras para cloud (Railway, etc)
+        connectionTimeout: 10000, // 10 segundos
+        greetingTimeout: 10000,
+        socketTimeout: 30000, // 30 segundos
       });
-      console.log(`📧 Configurando email com SMTP: ${smtpHost || 'smtp.hostinger.com'}:${smtpPort || '587'}`);
+      console.log(`📧 Configurando email com SMTP: ${smtpHost || 'smtp.hostinger.com'}:${port} (${isSecure ? 'SSL' : 'TLS'})`);
     }
 
     // Verificar conexão
